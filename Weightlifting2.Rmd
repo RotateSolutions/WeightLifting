@@ -50,7 +50,7 @@ testPreProc <- predict(preProcValues, testTidy)
 testPreProc$classe <- testOutcomes
 ```
 Now, the first two principal components are plotted:
-```{r include=FALSE}
+```{r}
 plot(trainPreProc$PC1,trainPreProc$PC2,col=trainPreProc$classe,
         xlab="Principal Component 1",ylab="Principal Component 2")
 ```
