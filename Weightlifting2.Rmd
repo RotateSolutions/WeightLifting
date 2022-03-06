@@ -1,0 +1,71 @@
+---
+title: "Predicting manner of barbell lift from accelerometer data."
+author: "Jason Colwell"
+date: "3/3/2022"
+---
+
+```{r setup, include=TRUE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<!-- reference for R Markdown: http://rmarkdown.rstudio.com -->
+
+```{r, include=FALSE}
+library(tidyverse)
+library(caret)
+library(kernlab)
+set.seed(1234)
+```
+
+## goal
+
+The goal of this project is to predict the manner in which the exercise was performed, using data from accelerometers worn during the exercises.  The outcome variable is the "classe" variable in the training set. 
+
+## importing and tidying of data
+
+The training and testing data are imported from CSV files.  The data is tidied.
+```{r message=FALSE, warning=FALSE}
+training <- read_csv('pml-training.csv')
+testing <- read_csv('pml-testing.csv')
+trainOutcomes <- as.factor(training$classe)
+testOutcomes <- testing$problem_id 
+training <- training[,-c(1:7,160)]
+testing <- testing[,-c(1:7,160)]
+quantColumns <- sapply(training,class)!='character'
+trainQuant <- training[quantColumns]
+testQuant <- testing[quantColumns]
+finiteColumns <- sapply(trainQuant[1,], is.finite)
+# The above works because the columns with non-finite entries are exactly those with non-finite first entry.
+trainTidy <- trainQuant[finiteColumns]
+trainTidy <- as.data.frame(trainTidy)
+testTidy <- testQuant[finiteColumns]
+testTidy <- as.data.frame(testTidy)
+```
+Now we center and scale the training set, and correspondingly transform the test set:
+```{r}
+preProcValues <- preProcess(trainTidy, method = c("center", "scale","pca"),pcaComp = 10)
+trainPreProc <- predict(preProcValues, trainTidy)
+trainPreProc$classe <- trainOutcomes
+testPreProc <- predict(preProcValues, testTidy)
+testPreProc$classe <- testOutcomes
+```
+Now, the first two principal components are plotted:
+```{r include=FALSE}
+plot(trainPreProc$PC1,trainPreProc$PC2,col=trainPreProc$classe,
+        xlab="Principal Component 1",ylab="Principal Component 2")
+```
+The plot suggests that the outcomes might be difficult to distinguish linearly (e.g. by Linear Discriminant Analysis). Rather, the outcomes appear to be clumped together. Accordinly, we will construct a K-Nearest Neighbor model, trying each of the values 5,7,9 of 'k'.
+
+Cross-validation with 5 folds was applied to the training set the model. Here, the train-control is defined, and the model is constructed, using Accuracy as the metric:
+```{r}
+control<- trainControl(method="cv", number=5)
+modelKNN<- train(classe~., data=trainPreProc, trControl=control, metric="Accuracy", method="knn")
+```
+
+Here is the model. The value of 'k' selected is 5, which produces an accuracy of over 94%:
+```{r}
+print(modelKNN)
+```
+
+## out-of-sample error
+As cross validation was used, the accuracy of the model on the test set should be similar to that from the 5-fold cross-validation. Accordingly, an out-of-sample error of 6% is predicted.
